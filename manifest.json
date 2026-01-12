@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Tab Declutter",
+  "version": "1.0.2",
+  "description": "Organize, group, and bulk-close your Chrome tabs with ease.",
+  "permissions": [
+    "tabs",
+    "storage"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

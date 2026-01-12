@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tab Declutter</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="header-top">
+        <h1>Tab Declutter</h1>
+      </div>
+      <div class="stats-bar">
+        <div class="stat">
+          <span class="stat-number" id="totalTabs">0</span>
+          <span class="stat-label">tabs open</span>
+        </div>
+        <div class="stat">
+          <span class="stat-number" id="groupCount">0</span>
+          <span class="stat-label">domains</span>
+        </div>
+        <div class="stat">
+          <span class="stat-number" id="selectedStat">0</span>
+          <span class="stat-label">selected</span>
+        </div>
+      </div>
+    </header>
+
+    <nav class="view-toggle">
+      <button id="btnDomainView" class="view-btn active">By Domain</button>
+      <button id="btnSmartView" class="view-btn">Smart Groups</button>
+      <button id="btnHistoryView" class="view-btn">History</button>
+    </nav>
+
+    <div class="actions-bar">
+      <div class="actions-left">
+        <label class="select-all">
+          <input type="checkbox" id="selectAll">
+          <span>Select All</span>
+        </label>
+        <div class="expand-controls">
+          <button id="btnExpandAll" class="btn-expand" title="Expand All">+ All</button>
+          <button id="btnCollapseAll" class="btn-expand" title="Collapse All">− All</button>
+        </div>
+      </div>
+      <button id="btnCloseSelected" class="btn-close" disabled>
+        Close Selected (<span id="selectedCount">0</span>)
+      </button>
+    </div>
+
+    <main id="tabList" class="tab-list">
+      <!-- Tab groups will be rendered here -->
+    </main>
+
+    <div id="historyView" class="history-view hidden">
+      <div class="history-header">
+        <h2>Recently Closed</h2>
+        <button id="btnClearHistory" class="btn-clear">Clear History</button>
+      </div>
+      <div id="historyList" class="history-list">
+        <!-- History items will be rendered here -->
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
