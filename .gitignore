@@ -1,6 +1,9 @@
 # Backup files
 *.bak
 
+# Release zips
+*.zip
+
 # OS files
 .DS_Store
 
