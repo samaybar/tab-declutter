@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tab Declutter",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Organize, group, and bulk-close your Chrome tabs with ease.",
   "permissions": [
     "tabs",
@@ -9,5 +9,14 @@
   ],
   "action": {
     "default_popup": "popup.html"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      },
+      "description": "Open Tab Declutter"
+    }
   }
 }

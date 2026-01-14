@@ -5,14 +5,24 @@ A Chrome extension to help you organize, review, and bulk-close browser tabs.
 ## Features
 
 - **Domain Grouping** - Tabs grouped by website domain
+- **Window Grouping** - Tabs grouped by browser window, then by domain within each
 - **Smart Grouping** - Automatic categorization (Shopping, Development, Social Media, News, etc.)
+- **Age Indicators** - Visual indicator showing how recently each tab was accessed
+- **Opener Tracking** - Colored dots showing tabs opened from the same parent
 - **Bulk Selection** - Select individual tabs or entire groups with checkboxes
 - **Bulk Close** - Close all selected tabs with one click
 - **History** - View and reopen previously closed tabs
 - **Keyboard Navigation** - Full keyboard support for efficient workflow
+- **Keyboard Shortcut** - Quick access via Cmd+Shift+Y (customizable)
 - **Persistent Selections** - Your selections are remembered when you close the popup
 
 ## Keyboard Shortcuts
+
+**Open Extension:** `Cmd+Shift+Y` (Mac) / `Ctrl+Shift+Y` (Windows/Linux)
+
+Customize at `chrome://extensions/shortcuts`
+
+**In the popup:**
 
 | Key | Action |
 |-----|--------|

@@ -75,7 +75,9 @@ const CATEGORY_KEYWORDS = {
 // State
 let allTabs = [];
 let selectedTabIds = new Set();
-let currentView = 'domain'; // 'domain', 'smart', or 'history'
+let currentView = 'domain'; // 'flat', 'domain', 'window', 'smart', or 'history'
+let openerColors = new Map(); // Maps openerTabId to color
+let windowEmojis = new Map(); // Maps windowId to emoji
 
 // DOM elements
 const elements = {
@@ -87,7 +89,9 @@ const elements = {
   btnExpandAll: document.getElementById('btnExpandAll'),
   btnCollapseAll: document.getElementById('btnCollapseAll'),
   btnCloseSelected: document.getElementById('btnCloseSelected'),
+  btnFlatView: document.getElementById('btnFlatView'),
   btnDomainView: document.getElementById('btnDomainView'),
+  btnWindowView: document.getElementById('btnWindowView'),
   btnSmartView: document.getElementById('btnSmartView'),
   btnHistoryView: document.getElementById('btnHistoryView'),
   tabList: document.getElementById('tabList'),
@@ -133,7 +137,9 @@ function setupEventListeners() {
   elements.btnExpandAll.addEventListener('click', expandAllGroups);
   elements.btnCollapseAll.addEventListener('click', collapseAllGroups);
   elements.btnCloseSelected.addEventListener('click', closeSelectedTabs);
+  elements.btnFlatView.addEventListener('click', () => switchView('flat'));
   elements.btnDomainView.addEventListener('click', () => switchView('domain'));
+  elements.btnWindowView.addEventListener('click', () => switchView('window'));
   elements.btnSmartView.addEventListener('click', () => switchView('smart'));
   elements.btnHistoryView.addEventListener('click', () => switchView('history'));
   elements.btnClearHistory.addEventListener('click', clearHistory);
@@ -275,9 +281,13 @@ function collapseAllGroups() {
   });
 }
 
+let currentWindowId = null;
+
 async function loadTabs() {
   try {
     allTabs = await chrome.tabs.query({});
+    const currentWindow = await chrome.windows.getCurrent();
+    currentWindowId = currentWindow.id;
     console.log('Loaded tabs:', allTabs.length);
     elements.totalTabs.textContent = allTabs.length;
   } catch (err) {
@@ -306,6 +316,88 @@ function truncateUrl(url) {
   } catch {
     return url;
   }
+}
+
+// Age indicator - returns class based on how old the tab is
+function getAgeInfo(lastAccessed) {
+  if (!lastAccessed) return { class: 'age-unknown', title: 'Unknown age', icon: '○' };
+
+  const now = Date.now();
+  const ageMs = now - lastAccessed;
+  const ageMinutes = ageMs / (1000 * 60);
+  const ageHours = ageMinutes / 60;
+  const ageDays = ageHours / 24;
+
+  if (ageMinutes < 5) {
+    return { class: 'age-now', title: 'Just accessed', icon: '●' };
+  } else if (ageMinutes < 30) {
+    return { class: 'age-recent', title: `${Math.round(ageMinutes)} min ago`, icon: '●' };
+  } else if (ageHours < 2) {
+    return { class: 'age-hour', title: `${Math.round(ageMinutes)} min ago`, icon: '●' };
+  } else if (ageHours < 24) {
+    return { class: 'age-hours', title: `${Math.round(ageHours)} hours ago`, icon: '◐' };
+  } else if (ageDays < 7) {
+    return { class: 'age-days', title: `${Math.round(ageDays)} days ago`, icon: '◑' };
+  } else {
+    return { class: 'age-old', title: `${Math.round(ageDays)} days ago`, icon: '○' };
+  }
+}
+
+// Opener colors - generate consistent colors for tabs from the same opener
+const OPENER_COLORS = [
+  '#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6',
+  '#1abc9c', '#e67e22', '#34495e', '#16a085', '#c0392b',
+  '#8e44ad', '#27ae60', '#d35400', '#2980b9', '#f1c40f'
+];
+
+function assignOpenerColors(tabs) {
+  openerColors.clear();
+  const openerIds = new Set();
+
+  // Collect all unique opener IDs
+  for (const tab of tabs) {
+    if (tab.openerTabId) {
+      openerIds.add(tab.openerTabId);
+    }
+  }
+
+  // Assign colors to each opener
+  let colorIndex = 0;
+  for (const openerId of openerIds) {
+    openerColors.set(openerId, OPENER_COLORS[colorIndex % OPENER_COLORS.length]);
+    colorIndex++;
+  }
+}
+
+function getOpenerColor(tab) {
+  if (!tab.openerTabId) return null;
+  return openerColors.get(tab.openerTabId) || null;
+}
+
+// Window emojis - fun distinct animals for each window
+const WINDOW_EMOJIS = [
+  '🐶', '🐱', '🦊', '🐼', '🐨', '🦁', '🐯', '🐸',
+  '🐙', '🦋', '🐢', '🦉', '🐬', '🦩', '🐝', '🦄'
+];
+
+function assignWindowEmojis(tabs) {
+  windowEmojis.clear();
+  const windowIds = [...new Set(tabs.map(t => t.windowId))];
+
+  // Sort so current window gets first emoji
+  windowIds.sort((a, b) => {
+    if (a === currentWindowId) return -1;
+    if (b === currentWindowId) return 1;
+    return a - b;
+  });
+
+  windowIds.forEach((id, index) => {
+    windowEmojis.set(id, WINDOW_EMOJIS[index % WINDOW_EMOJIS.length]);
+  });
+}
+
+function getWindowEmoji(windowId) {
+  return windowEmojis.get(windowId) || '⬜';
 }
 
 function getBaseDomain(domain) {
@@ -386,18 +478,138 @@ function groupTabsByCategory(tabs) {
   }, {});
 }
 
+function groupTabsByWindow(tabs) {
+  const windows = {};
+
+  for (const tab of tabs) {
+    const windowId = tab.windowId;
+    if (!windows[windowId]) {
+      windows[windowId] = [];
+    }
+    windows[windowId].push(tab);
+  }
+
+  // Sort windows by number of tabs (descending)
+  return Object.entries(windows)
+    .sort((a, b) => b[1].length - a[1].length)
+    .reduce((acc, [key, value]) => {
+      acc[key] = value;
+      return acc;
+    }, {});
+}
+
 function renderTabs() {
-  const groups = currentView === 'domain'
-    ? groupTabsByDomain(allTabs)
-    : groupTabsByCategory(allTabs);
+  // Assign opener colors and window emojis for all tabs
+  assignOpenerColors(allTabs);
+  assignWindowEmojis(allTabs);
 
   elements.tabList.innerHTML = '';
-  elements.groupCount.textContent = Object.keys(groups).length;
 
-  for (const [groupName, tabs] of Object.entries(groups)) {
-    const groupEl = createGroupElement(groupName, tabs);
-    elements.tabList.appendChild(groupEl);
+  if (currentView === 'flat') {
+    // Flat view - all tabs sorted by domain
+    const sortedTabs = [...allTabs].sort((a, b) => {
+      const domainA = getDomain(a.url);
+      const domainB = getDomain(b.url);
+      return domainA.localeCompare(domainB);
+    });
+
+    elements.groupCount.textContent = allTabs.length;
+
+    const flatList = document.createElement('div');
+    flatList.className = 'flat-list';
+
+    for (const tab of sortedTabs) {
+      const tabEl = createTabElement(tab, true);
+      flatList.appendChild(tabEl);
+    }
+    elements.tabList.appendChild(flatList);
+
+  } else if (currentView === 'window') {
+    const windows = groupTabsByWindow(allTabs);
+
+    for (const [windowId, windowTabs] of Object.entries(windows)) {
+      const windowEl = createWindowElement(windowId, windowTabs, Object.keys(windows).indexOf(windowId) + 1);
+      elements.tabList.appendChild(windowEl);
+    }
+    elements.groupCount.textContent = Object.keys(windows).length + ' win';
+
+  } else {
+    const groups = currentView === 'domain'
+      ? groupTabsByDomain(allTabs)
+      : groupTabsByCategory(allTabs);
+
+    elements.groupCount.textContent = Object.keys(groups).length;
+
+    for (const [groupName, tabs] of Object.entries(groups)) {
+      const groupEl = createGroupElement(groupName, tabs);
+      elements.tabList.appendChild(groupEl);
+    }
   }
+}
+
+function createWindowElement(windowId, windowTabs, windowNumber) {
+  const windowEl = document.createElement('div');
+  windowEl.className = 'window-group';
+
+  const windowHeader = document.createElement('div');
+  windowHeader.className = 'window-header';
+
+  const windowCheckbox = document.createElement('input');
+  windowCheckbox.type = 'checkbox';
+  windowCheckbox.className = 'window-checkbox';
+  windowCheckbox.checked = windowTabs.every(t => selectedTabIds.has(t.id));
+  windowCheckbox.addEventListener('change', () => {
+    for (const tab of windowTabs) {
+      if (windowCheckbox.checked) {
+        selectedTabIds.add(tab.id);
+      } else {
+        selectedTabIds.delete(tab.id);
+      }
+    }
+    updateSelectionUI();
+    saveSelectedTabs();
+    renderTabs();
+  });
+
+  const windowTitle = document.createElement('span');
+  windowTitle.className = 'window-title';
+  const isCurrentWindow = parseInt(windowId) === currentWindowId;
+  const emoji = getWindowEmoji(parseInt(windowId));
+  windowTitle.textContent = `${emoji} Window ${windowNumber}${isCurrentWindow ? ' (current)' : ''}`;
+
+  const windowCount = document.createElement('span');
+  windowCount.className = 'window-count';
+  windowCount.textContent = `${windowTabs.length} tabs`;
+
+  const windowToggle = document.createElement('button');
+  windowToggle.className = 'toggle-btn';
+  windowToggle.textContent = '−';
+  windowToggle.tabIndex = -1;
+  windowToggle.addEventListener('click', () => {
+    const content = windowEl.querySelector('.window-content');
+    const isCollapsed = content.classList.toggle('collapsed');
+    windowToggle.textContent = isCollapsed ? '+' : '−';
+  });
+
+  windowHeader.appendChild(windowCheckbox);
+  windowHeader.appendChild(windowTitle);
+  windowHeader.appendChild(windowCount);
+  windowHeader.appendChild(windowToggle);
+
+  const windowContent = document.createElement('div');
+  windowContent.className = 'window-content';
+
+  // Group tabs by domain within this window
+  const domainGroups = groupTabsByDomain(windowTabs);
+  for (const [domain, tabs] of Object.entries(domainGroups)) {
+    const groupEl = createGroupElement(domain, tabs);
+    windowContent.appendChild(groupEl);
+  }
+
+  windowEl.appendChild(windowHeader);
+  windowEl.appendChild(windowContent);
+
+  return windowEl;
 }
 
 function createGroupElement(groupName, tabs) {
@@ -503,6 +715,31 @@ function createTabElement(tab, showDomain = false) {
     // Ensure focus stays on this checkbox
     checkbox.focus();
   });
+
+  // Window emoji indicator
+  const windowEmoji = document.createElement('span');
+  windowEmoji.className = 'window-emoji';
+  windowEmoji.textContent = getWindowEmoji(tab.windowId);
+  windowEmoji.title = `Window ${[...windowEmojis.keys()].indexOf(tab.windowId) + 1}${tab.windowId === currentWindowId ? ' (current)' : ''}`;
+  tabEl.appendChild(windowEmoji);
+
+  // Opener color indicator
+  const openerColor = getOpenerColor(tab);
+  if (openerColor) {
+    const openerDot = document.createElement('span');
+    openerDot.className = 'opener-dot';
+    openerDot.style.backgroundColor = openerColor;
+    openerDot.title = 'Opened from same parent tab';
+    tabEl.appendChild(openerDot);
+  }
+
+  // Age indicator
+  const ageInfo = getAgeInfo(tab.lastAccessed);
+  const ageIndicator = document.createElement('span');
+  ageIndicator.className = `age-indicator ${ageInfo.class}`;
+  ageIndicator.textContent = ageInfo.icon;
+  ageIndicator.title = ageInfo.title;
+  tabEl.appendChild(ageIndicator);
 
   const favicon = document.createElement('img');
   favicon.className = 'tab-favicon';
@@ -725,7 +962,9 @@ function switchView(view) {
   currentView = view;
 
   // Update button states
+  elements.btnFlatView.classList.toggle('active', view === 'flat');
   elements.btnDomainView.classList.toggle('active', view === 'domain');
+  elements.btnWindowView.classList.toggle('active', view === 'window');
   elements.btnSmartView.classList.toggle('active', view === 'smart');
   elements.btnHistoryView.classList.toggle('active', view === 'history');
 

@@ -74,15 +74,16 @@ header h1 {
 
 .view-btn {
   flex: 1;
-  padding: 8px 12px;
+  padding: 8px 8px;
   border: none;
   background: #f0f0f0;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   color: #666;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .view-btn:hover {
@@ -262,6 +263,130 @@ header h1 {
 
 .group-preview.hidden {
   display: none;
+}
+
+/* Window grouping */
+.window-group {
+  background: #f0f0f5;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  padding: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.window-header {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  gap: 8px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 6px;
+  color: white;
+  margin-bottom: 8px;
+}
+
+.window-checkbox {
+  cursor: pointer;
+}
+
+.window-title {
+  font-weight: 600;
+  flex: 1;
+}
+
+.window-count {
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.window-header .toggle-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: none;
+}
+
+.window-header .toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.window-content {
+  padding-left: 4px;
+}
+
+.window-content.collapsed {
+  display: none;
+}
+
+.window-content .tab-group {
+  margin-bottom: 6px;
+}
+
+/* Age indicators */
+.age-indicator {
+  font-size: 10px;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.age-now {
+  color: #2ecc71;
+}
+
+.age-recent {
+  color: #27ae60;
+}
+
+.age-hour {
+  color: #f1c40f;
+}
+
+.age-hours {
+  color: #f39c12;
+}
+
+.age-days {
+  color: #e67e22;
+}
+
+.age-old {
+  color: #e74c3c;
+}
+
+.age-unknown {
+  color: #bdc3c7;
+}
+
+/* Opener dot indicator */
+.opener-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: -4px;
+}
+
+/* Window emoji indicator */
+.window-emoji {
+  font-size: 10px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* Flat list view */
+.flat-list {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.flat-list .tab-item {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.flat-list .tab-item:last-child {
+  border-bottom: none;
 }
 
 .tab-item {
