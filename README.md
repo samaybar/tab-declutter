@@ -7,6 +7,7 @@ A Chrome extension to help you organize, review, and bulk-close browser tabs.
 - **Domain Grouping** - Tabs grouped by website domain
 - **Window Grouping** - Tabs grouped by browser window, then by domain within each
 - **Smart Grouping** - Automatic categorization (Shopping, Development, Social Media, News, etc.)
+- **Duplicate Detection** - Find and close duplicate tabs, keeping one copy of each URL
 - **Age Indicators** - Visual indicator showing how recently each tab was accessed
 - **Opener Tracking** - Colored dots showing tabs opened from the same parent
 - **Bulk Selection** - Select individual tabs or entire groups with checkboxes
@@ -58,10 +59,11 @@ Customize at `chrome://extensions/shortcuts`
 ## Usage
 
 1. Click the Tab Declutter icon in your Chrome toolbar
-2. Browse your tabs grouped by domain or smart categories
-3. Use checkboxes to select tabs you want to close
-4. Click "Close Selected" to close them
-5. View closed tabs in the History tab to reopen if needed
+2. Browse your tabs grouped by domain, smart categories, or duplicates
+3. Use the **Duplicates** view to find tabs with the same URL — the first copy is marked "keeping" and the extras can be selected for closing
+4. Use checkboxes to select tabs you want to close
+5. Click "Close Selected" to close them
+6. View closed tabs in the History tab to reopen if needed
 
 ## License
 

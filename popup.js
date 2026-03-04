@@ -75,7 +75,8 @@ const CATEGORY_KEYWORDS = {
 // State
 let allTabs = [];
 let selectedTabIds = new Set();
-let currentView = 'domain'; // 'flat', 'domain', 'window', 'smart', or 'history'
+let duplicateTabIds = new Set();
+let currentView = 'domain'; // 'flat', 'domain', 'window', 'smart', 'duplicates', or 'history'
 let openerColors = new Map(); // Maps openerTabId to color
 let windowEmojis = new Map(); // Maps windowId to emoji
 
@@ -93,6 +94,7 @@ const elements = {
   btnDomainView: document.getElementById('btnDomainView'),
   btnWindowView: document.getElementById('btnWindowView'),
   btnSmartView: document.getElementById('btnSmartView'),
+  btnDuplicatesView: document.getElementById('btnDuplicatesView'),
   btnHistoryView: document.getElementById('btnHistoryView'),
   tabList: document.getElementById('tabList'),
   historyView: document.getElementById('historyView'),
@@ -141,6 +143,7 @@ function setupEventListeners() {
   elements.btnDomainView.addEventListener('click', () => switchView('domain'));
   elements.btnWindowView.addEventListener('click', () => switchView('window'));
   elements.btnSmartView.addEventListener('click', () => switchView('smart'));
+  elements.btnDuplicatesView.addEventListener('click', () => switchView('duplicates'));
   elements.btnHistoryView.addEventListener('click', () => switchView('history'));
   elements.btnClearHistory.addEventListener('click', clearHistory);
 
@@ -498,14 +501,51 @@ function groupTabsByWindow(tabs) {
     }, {});
 }
 
+function groupTabsByDuplicate(tabs) {
+  const urlMap = new Map();
+  for (const tab of tabs) {
+    if (!tab.url) continue;
+    if (!urlMap.has(tab.url)) {
+      urlMap.set(tab.url, []);
+    }
+    urlMap.get(tab.url).push(tab);
+  }
+
+  // Only keep URLs with 2+ tabs
+  const groups = {};
+  for (const [url, urlTabs] of urlMap) {
+    if (urlTabs.length >= 2) {
+      const title = urlTabs[0].title || getDomain(url);
+      groups[title] = urlTabs;
+    }
+  }
+
+  return groups;
+}
+
 function renderTabs() {
   // Assign opener colors and window emojis for all tabs
   assignOpenerColors(allTabs);
   assignWindowEmojis(allTabs);
 
   elements.tabList.innerHTML = '';
+  updateDuplicateIds();
 
-  if (currentView === 'flat') {
+  if (currentView === 'duplicates') {
+    const groups = groupTabsByDuplicate(allTabs);
+    elements.groupCount.textContent = Object.keys(groups).length;
+
+    if (Object.keys(groups).length === 0) {
+      elements.tabList.innerHTML = '<div class="empty-state">No duplicate tabs found</div>';
+      return;
+    }
+
+    for (const [groupName, tabs] of Object.entries(groups)) {
+      const groupEl = createGroupElement(groupName, tabs);
+      elements.tabList.appendChild(groupEl);
+    }
+
+  } else if (currentView === 'flat') {
     // Flat view - all tabs sorted by domain
     const sortedTabs = [...allTabs].sort((a, b) => {
       const domainA = getDomain(a.url);
@@ -681,10 +721,16 @@ function createGroupElement(groupName, tabs) {
   preview.title = tabs.map(t => t.title || 'Untitled').join('\n');
 
   const tabsContainer = document.createElement('div');
-  tabsContainer.className = 'group-tabs collapsed';
+  const startExpanded = currentView === 'duplicates';
+  tabsContainer.className = startExpanded ? 'group-tabs' : 'group-tabs collapsed';
+  if (startExpanded) {
+    toggleBtn.textContent = '−';
+    preview.classList.add('hidden');
+  }
 
-  for (const tab of tabs) {
-    const tabEl = createTabElement(tab, false);
+  for (let i = 0; i < tabs.length; i++) {
+    const isKept = currentView === 'duplicates' && i === 0;
+    const tabEl = createTabElement(tabs[i], false, isKept);
     tabsContainer.appendChild(tabEl);
   }
 
@@ -695,7 +741,7 @@ function createGroupElement(groupName, tabs) {
   return group;
 }
 
-function createTabElement(tab, showDomain = false) {
+function createTabElement(tab, showDomain = false, isKept = false) {
   const tabEl = document.createElement('div');
   tabEl.className = 'tab-item';
   if (showDomain) {
@@ -704,17 +750,23 @@ function createTabElement(tab, showDomain = false) {
   if (selectedTabIds.has(tab.id)) {
     tabEl.classList.add('selected');
   }
+  if (duplicateTabIds.has(tab.id)) {
+    tabEl.classList.add('duplicate');
+  }
 
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
   checkbox.className = 'tab-checkbox';
   checkbox.checked = selectedTabIds.has(tab.id);
   checkbox.tabIndex = showDomain ? 0 : -1; // Single tabs are tabbable, grouped tabs start collapsed
-  checkbox.addEventListener('change', () => {
-    handleTabSelect(tab.id, checkbox.checked);
-    // Ensure focus stays on this checkbox
-    checkbox.focus();
-  });
+  if (isKept) {
+    checkbox.disabled = true;
+  } else {
+    checkbox.addEventListener('change', () => {
+      handleTabSelect(tab.id, checkbox.checked);
+      checkbox.focus();
+    });
+  }
 
   // Window emoji indicator
   const windowEmoji = document.createElement('span');
@@ -749,16 +801,26 @@ function createTabElement(tab, showDomain = false) {
   const info = document.createElement('div');
   info.className = 'tab-info';
 
-  const title = document.createElement('div');
-  title.className = 'tab-title';
-  title.textContent = tab.title || 'Untitled';
-  title.title = tab.title;
+  const titleRow = document.createElement('div');
+  titleRow.className = 'tab-title';
+
+  const titleText = document.createElement('span');
+  titleText.textContent = tab.title || 'Untitled';
+  titleText.title = tab.title;
+  titleRow.appendChild(titleText);
+
+  if (isKept) {
+    const badge = document.createElement('span');
+    badge.className = 'kept-badge';
+    badge.textContent = 'keeping';
+    titleRow.appendChild(badge);
+  }
 
   const url = document.createElement('div');
   url.className = 'tab-url';
   url.textContent = showDomain ? getDomain(tab.url) : truncateUrl(tab.url);
 
-  info.appendChild(title);
+  info.appendChild(titleRow);
   info.appendChild(url);
 
   const goToBtn = document.createElement('button');
@@ -777,12 +839,14 @@ function createTabElement(tab, showDomain = false) {
   tabEl.appendChild(goToBtn);
 
   // Click on row (not checkbox) to toggle
-  tabEl.addEventListener('click', (e) => {
-    if (e.target !== checkbox) {
-      checkbox.checked = !checkbox.checked;
-      handleTabSelect(tab.id, checkbox.checked);
-    }
-  });
+  if (!isKept) {
+    tabEl.addEventListener('click', (e) => {
+      if (e.target !== checkbox) {
+        checkbox.checked = !checkbox.checked;
+        handleTabSelect(tab.id, checkbox.checked);
+      }
+    });
+  }
 
   return tabEl;
 }
@@ -798,11 +862,13 @@ function handleTabSelect(tabId, isSelected) {
 }
 
 function handleGroupSelect(groupName, tabs, isSelected) {
-  for (const tab of tabs) {
+  // In duplicates view, skip the first tab (the one we keep)
+  const startIndex = currentView === 'duplicates' ? 1 : 0;
+  for (let i = startIndex; i < tabs.length; i++) {
     if (isSelected) {
-      selectedTabIds.add(tab.id);
+      selectedTabIds.add(tabs[i].id);
     } else {
-      selectedTabIds.delete(tab.id);
+      selectedTabIds.delete(tabs[i].id);
     }
   }
   updateSelectionUI();
@@ -810,9 +876,17 @@ function handleGroupSelect(groupName, tabs, isSelected) {
   renderTabs(); // Re-render to update individual checkboxes
 }
 
+function getSelectableTabs() {
+  if (currentView === 'duplicates') {
+    return getDuplicateTabs();
+  }
+  return allTabs;
+}
+
 function handleSelectAll(e) {
   const isSelected = e.target.checked;
-  for (const tab of allTabs) {
+  const tabs = getSelectableTabs();
+  for (const tab of tabs) {
     if (isSelected) {
       selectedTabIds.add(tab.id);
     } else {
@@ -828,8 +902,13 @@ function updateSelectionUI() {
   elements.selectedCount.textContent = selectedTabIds.size;
   elements.selectedStat.textContent = selectedTabIds.size;
   elements.btnCloseSelected.disabled = selectedTabIds.size === 0;
-  elements.selectAll.checked = selectedTabIds.size === allTabs.length && allTabs.length > 0;
-  elements.selectAll.indeterminate = selectedTabIds.size > 0 && selectedTabIds.size < allTabs.length;
+
+  const selectableTabs = getSelectableTabs();
+  const selectableIds = new Set(selectableTabs.map(t => t.id));
+  const selectedInView = selectableTabs.filter(t => selectedTabIds.has(t.id)).length;
+
+  elements.selectAll.checked = selectedInView === selectableTabs.length && selectableTabs.length > 0;
+  elements.selectAll.indeterminate = selectedInView > 0 && selectedInView < selectableTabs.length;
 
   // Update individual tab selections visually
   document.querySelectorAll('.tab-item').forEach(el => {
@@ -838,6 +917,31 @@ function updateSelectionUI() {
       el.classList.toggle('selected', checkbox.checked);
     }
   });
+}
+
+function getDuplicateTabs() {
+  const seen = new Map();
+  const duplicates = [];
+
+  for (const tab of allTabs) {
+    if (!tab.url) continue;
+    if (seen.has(tab.url)) {
+      duplicates.push(tab);
+    } else {
+      seen.set(tab.url, tab);
+    }
+  }
+
+  return duplicates;
+}
+
+function updateDuplicateIds() {
+  const dupes = getDuplicateTabs();
+  duplicateTabIds = new Set(dupes.map(t => t.id));
+
+  // Update the duplicates view button with count
+  const count = dupes.length;
+  elements.btnDuplicatesView.textContent = count > 0 ? `Duplicates (${count})` : 'Duplicates';
 }
 
 async function closeSelectedTabs() {
@@ -966,6 +1070,7 @@ function switchView(view) {
   elements.btnDomainView.classList.toggle('active', view === 'domain');
   elements.btnWindowView.classList.toggle('active', view === 'window');
   elements.btnSmartView.classList.toggle('active', view === 'smart');
+  elements.btnDuplicatesView.classList.toggle('active', view === 'duplicates');
   elements.btnHistoryView.classList.toggle('active', view === 'history');
 
   // Show/hide appropriate sections
